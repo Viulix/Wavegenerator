@@ -3,7 +3,7 @@ from tkinter import ttk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
-
+import mathfunctions as mf
 def update_plot():
     signal_type = signal_var.get()
     freq = float(freq_entry.get()) if freq_entry.get() else 1.0
@@ -29,6 +29,7 @@ def send_signal():
     unit = unit_var.get()
     freq = freq_entry.get()
     print(f"Signal: {signal_type}, Delta t: {delta_t} {unit}, Frequency: {freq} Hz")
+    print(mf.generateSQUSQU)
 
 # Hauptfenster erstellen
 root = tk.Tk()
