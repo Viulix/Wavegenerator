@@ -14,7 +14,7 @@ control_frame = tk.Frame(root, bg="#f0f0f0")
 control_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
 
 # Grid-Layout konfigurieren
-for i in range(6):
+for i in range(7):
     control_frame.columnconfigure(i, weight=1)
 
 def add_labeled_entry(frame, label_text, row, unit_options=None):
@@ -55,10 +55,13 @@ droptime_entry.insert(0, "7")
 delta_t_entry, delta_t_unit = add_labeled_entry(control_frame, "Delta t:", 5, ["ms", "µs"])
 delta_t_entry.insert(0, "0")
 
+pulse_width, pulse_unit = add_labeled_entry(control_frame, "Pulse Width:", 6, ["ms"])
+pulse_width.insert(0, "10")
+
 # Burst-Mode Checkbox
 burst_var = tk.BooleanVar(value=True)
 burst_check = tk.Checkbutton(control_frame, text="Burst-Mode", variable=burst_var, bg="#f0f0f0", font=("Arial", 12))
-burst_check.grid(row=6, column=0, columnspan=2, pady=5, sticky="w")
+burst_check.grid(row=7, column=0, columnspan=2, pady=5, sticky="w")
 
 load_button = tk.Button(control_frame, text="Load Profile", command=lambda: loadProfile(
                             signal_var.get(),
@@ -67,21 +70,21 @@ load_button = tk.Button(control_frame, text="Load Profile", command=lambda: load
                             peaktime_entry.get(), peaktime_unit.get(),
                             droptime_entry.get(), droptime_unit.get(),
                             delta_t_entry.get(), delta_t_unit.get(),
-                            burst_var.get()),
+                            burst_var.get(), pulse_width.get()),
                         bg="#2196F3", fg="white", font=("Arial", 12, "bold"))
-load_button.grid(row=7, column=3, columnspan=1, pady=6)
+load_button.grid(row=8, column=3, columnspan=1, pady=6)
 
 # Send-Button
 send_button = tk.Button(control_frame, text="Send Impuls", 
                         command=lambda: wf.sendTrigger(),
                         bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
-send_button.grid(row=7, column=1, columnspan=1, pady=6)
+send_button.grid(row=8, column=1, columnspan=1, pady=6)
 
 # Reset-Button mit Bestätigungsdialog
 reset_button = tk.Button(control_frame, text="Reset Device", 
                          command=lambda: messagebox.askyesno("Bestätigung", "Möchten Sie wirklich Erase ausführen?") 
                          and print("Reset Device: Befehl ausgeführt!"),
                          bg="#f44336", fg="white", font=("Arial", 12, "bold"))
-reset_button.grid(row=7, column=2, columnspan=1, pady=6)
+reset_button.grid(row=8, column=2, columnspan=1, pady=6)
 
 root.mainloop()
