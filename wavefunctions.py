@@ -1,61 +1,125 @@
 import mathfunctions as mf
 import pyvisa
 import time
+import matplotlib.pyplot as plt
+import numpy as np
 
+# Global load time (in seconds) for waiting after sending the pulse.
 rm = pyvisa.ResourceManager()
 defaultProfile = "ROUVEN"
 loadTimeSeconds = 7
+# Dummy implementations for functions assumed to exist.
+def sendAndSaveCustom(*args, **kwargs):
+    print("sendAndSaveCustom called with", args, kwargs)
+    
+def prepareTrigger(frequency, maxVoltage):
+    print("prepareTrigger called with frequency:", frequency, "maxVoltage:", maxVoltage)
 
-def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, peaktime_unit, droptime, droptime_unit, delta_t, delta_t_unit, burst, pulseWidth):
+def safe_float(value_str, field_name="Value"):
     """
-    Sendet den Impuls. Die Funktion wertet den Signaltyp aus und führt entsprechend unterschiedliche
-    Aktionen aus. Hier erfolgt die Unterscheidung demonstrativ über Print-Ausgaben.
+    Converts the given string to a float.
+    Raises an error if the conversion fails.
     """
-    if droptime_unit == "ms":
-        droptime = float(droptime)
-    if droptime_unit == "µs":
-        droptime = float(droptime)*10**(-3)
-    if peaktime_unit == "ms":
-        peaktime = float(peaktime)
-    if peaktime_unit == "µs":
-        peaktime = float(peaktime)*10**(-3)
-    if delta_t_unit == "ms":
-        delta_t = int(delta_t)
-    if delta_t_unit == "µs": # NEEDS TO BE REMOVED
-        delta_t = float(delta_t)*10**(-3)
+    try:
+        return float(value_str)
+    except ValueError:
+        raise ValueError(f"{field_name} must be a number.")
 
-    frequency = (1 / (float(pulseWidth)+ delta_t)) *10**3
-    print(frequency)
+def updatePlot(ax, canvas, pulse, pulseWidth):
+    """
+    Updates the embedded plot showing the loaded pulse.
+    
+    Parameters:
+      ax (matplotlib.axes.Axes): The axes to update.
+      canvas (FigureCanvasTkAgg): The canvas to redraw.
+      pulse (list or array of floats): The pulse amplitude values.
+      pulseWidth (float): The pulse width in milliseconds.
+    """
+    ax.clear()
+    if pulse is not None:
+        # Create a time axis assuming the pulse spans the entire pulseWidth.
+        N = len(pulse)
+        time_axis = np.linspace(0, pulseWidth, N)
+        ax.plot(time_axis, pulse, label="Pulse")
+        ax.set_xlabel("Time (ms)")
+        ax.set_ylabel("Amplitude (V)")
+        ax.set_title("Loaded Pulse")
+        ax.legend()
+    else:
+        ax.text(0.5, 0.5, "No pulse available", horizontalalignment='center',
+                verticalalignment='center', transform=ax.transAxes)
+        ax.set_title("Loaded Pulse")
+    canvas.draw()
 
-    if signal_type == "SQU - SQU":
+def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delta_t, burst, pulseWidth, ax, canvas):
+    """
+    Sends the pulse based on the provided parameters.
+    Evaluates the signal type and performs different actions,
+    then updates the embedded plot with the loaded pulse.
+    
+    Parameters:
+      signal_type (str): The type of signal ("Square", "Triangle", "Model").
+      amplitude (float): Amplitude in Volts.
+      drop_amplitude (float): Drop amplitude in Volts.
+      peaktime (float): Peaktime in milliseconds.
+      droptime (float): Droptime in milliseconds.
+      delta_t (float): Delta time in milliseconds.
+      burst (bool): Whether burst mode is enabled.
+      pulseWidth (float): Pulse width in milliseconds.
+      ax (matplotlib.axes.Axes): The axes to update.
+      canvas (FigureCanvasTkAgg): The canvas to redraw.
+    """
+    frequency = (1 / (float(pulseWidth) + delta_t)) * 10**3
+    pulse = None
+    maxVoltage = None
+
+    if signal_type == "Square":
+        # Generate the square pulse using the provided parameters.
         pulse = mf.generateSQUSQU(float(amplitude), float(drop_amplitude), peaktime, droptime, float(pulseWidth))
-        frequency = (1 / (float(pulseWidth)+ delta_t + 1)) *10**3
+        frequency = (1 / (float(pulseWidth) + delta_t + 1)) * 10**3
         maxVoltage = max(abs(pulse))
-        pulseDiff = mf.getPulseDifference(pulse, delta_t)
+        pulseDiff = mf.getPulseDifference(pulse, int(delta_t))
         normPulse = mf.normalizePulse(pulseDiff)
         datastring = ",".join(map(str, normPulse))
-        sendAndSaveCustom("0," + datastring)
-        time.sleep(loadTimeSeconds)
-    elif signal_type == "SQU - EXP":
-        print("Aktion: SQU - EXP wird ausgeführt (z.B. quadratischer Impuls mit exponentiellem Abfall).")
-    elif signal_type == "EXP - EXP":
-        print("Aktion: EXP - EXP wird ausgeführt (z.B. exponentieller Impuls, der exponentiell abklingt).")
-    elif signal_type == "TRI - TRI":
-        print("Aktion: TRI - TRI wird ausgeführt (z.B. dreieckiger Impuls in beiden Phasen).")
+       # sendAndSaveCustom("0," + datastring)
+       # time.sleep(loadTimeSeconds)
+        # Update the embedded plot with the normalized pulse.
+        updatePlot(ax, canvas, normPulse * maxVoltage, float(pulseWidth))
+
+    elif signal_type == "Triangle":
+        print("Action: TRIANGLE is executed (e.g., triangular pulse in both phases).")
+        # For demonstration, generate a dummy triangular pulse.
+        N = 100  # number of points for half the pulse
+        rising = np.linspace(0, 1, N)
+        falling = np.linspace(1, 0, N)
+        pulse = np.concatenate((rising, falling))
+        updatePlot(ax, canvas, pulse, float(pulseWidth))
+        
     elif signal_type == "Model":
-        datastring = mf.normalize_and_format_function(mf.modelFunction, 24000, 0.001, 12)
-        print(datastring)
-        sendAndSaveCustom(20, 2, datastring)
-        time.sleep(loadTimeSeconds)
-    else:
-        print("Unbekannter Signaltyp!")
-        return
+        # datastring = mf.normalize_and_format_function(mf.modelFunction(), 24000, 0.001, 12)
+        # Generate x-values for the model function
+        x_values = np.linspace(0.001, 20, 1000)  # Define an appropriate range
+        pulse = mf.modelFunction(x_values, amplitude, drop_amplitude, 0.503)  # Compute y-values
+        print(pulse)
+        maxVoltage = max(abs(pulse))
+       # print(datastring)
+       # sendAndSaveCustom(20, 2, datastring)
+       # time.sleep(loadTimeSeconds)
+        updatePlot(ax, canvas, pulse, float(pulseWidth))
     
+    else:
+        print("Unknown type!")
+        updatePlot(ax, canvas, None, float(pulseWidth))
+        return
+
+    # If burst mode is enabled, prepare the trigger.
     if burst:
-        print("Preparing the triggermode")
-        prepareTrigger(frequency, maxVoltage)
-        time.sleep(3)
+        print("Preparing the trigger mode")
+      #  prepareTrigger(frequency, maxVoltage)
+      #  time.sleep(3)
+        
     print("Profile has been loaded.")
+
 
 def sendAndSaveCustom(customDatastring):
     smu = rm.open_resource('ASRL6::INSTR')
@@ -91,7 +155,6 @@ def sendCustom(signal_str:str, frequency, amplitude, offset=0):
     smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
     smu.write(f"APPL:USER {frequency}, {amplitude}, {offset}") # Activate Profile
     smu.close()
-
 
 def writeAndSaveCustom(signal_str:str):
     """Send a custom signal string and load it into a profile of the generator. Does not apply the profile."""

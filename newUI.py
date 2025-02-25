@@ -1,90 +1,164 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import wavefunctions as wf
-from wavefunctions import loadProfile
+import numpy as np
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
-# Hauptfenster erstellen
+# Import the functions from the separate file.
+import wavefunctions as pf
+
+# Create main window with increased size to accommodate the plot.
 root = tk.Tk()
 root.title("Signal Sender")
-root.geometry("700x350")  # Erhöhte Höhe für neue Elemente
+root.geometry("1000x500")
+root.minsize(800, 500)
 root.configure(bg="#f0f0f0")
 
-# Frame für Steuerung
-control_frame = tk.Frame(root, bg="#f0f0f0")
-control_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+# Set ttk style for a modern look.
+style = ttk.Style(root)
+style.theme_use("clam")
+style.configure("TButton", font=("Arial", 12, "bold"))
+style.configure("TLabel", font=("Arial", 12))
+style.configure("TEntry", font=("Arial", 12))
+style.configure("TCheckbutton", font=("Arial", 12))
 
-# Grid-Layout konfigurieren
-for i in range(7):
-    control_frame.columnconfigure(i, weight=1)
+# Custom button styles:
+# "Send.TButton" has a distinct green color and "Reset.TButton" is red.
+style.configure("Send.TButton", foreground="white", background="#4CAF50")
+style.map("Send.TButton", background=[("active", "#45A049")])
+style.configure("Reset.TButton", foreground="white", background="#f44336")
+style.map("Reset.TButton", background=[("active", "#d32f2f")])
 
-def add_labeled_entry(frame, label_text, row, unit_options=None):
-    label = tk.Label(frame, text=label_text, bg="#f0f0f0", font=("Arial", 12))
+# Create two main frames: one for controls and one for the plot.
+control_frame = ttk.Frame(root, padding=(10, 10, 10, 10))
+control_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+plot_frame = ttk.Frame(root, padding=(10, 10, 10, 10))
+plot_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+# Create the matplotlib Figure and embed it into the plot_frame.
+fig = Figure(figsize=(5, 4), dpi=100)
+ax = fig.add_subplot(111)
+canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+canvas.draw()
+canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+def add_labeled_entry(frame, label_text, row, unit_options=None, default_unit=None):
+    """
+    Adds a labeled entry field with an optional unit dropdown.
+    
+    Parameters:
+      frame: The parent frame.
+      label_text (str): The text for the label.
+      row (int): The grid row.
+      unit_options (list): List of unit options (e.g., ["ms", "µs"]).
+      default_unit (str): Default selected unit.
+      
+    Returns:
+      A tuple (entry_widget, unit_variable) or (entry_widget, None) if no unit options are provided.
+    """
+    label = ttk.Label(frame, text=label_text)
     label.grid(row=row, column=0, padx=5, pady=5, sticky="w")
-    entry = tk.Entry(frame)
-    entry.grid(row=row, column=1, padx=5, pady=5)
     
+    entry = ttk.Entry(frame)
+    entry.grid(row=row, column=1, padx=5, pady=5, sticky="ew")
+    
+    unit_var = None
     if unit_options:
-        unit_var = tk.StringVar(value=unit_options[0])
-        unit_dropdown = ttk.Combobox(frame, textvariable=unit_var, values=unit_options, state="readonly", width=5)
-        unit_dropdown.grid(row=row, column=2, padx=5, pady=5)
-        return entry, unit_var
-    
-    return entry, None  
+        unit_var = tk.StringVar(value=default_unit if default_unit else unit_options[0])
+        unit_dropdown = ttk.Combobox(frame, textvariable=unit_var,
+                                     values=unit_options, state="readonly", width=5)
+        unit_dropdown.grid(row=row, column=2, padx=5, pady=5, sticky="ew")
+    return entry, unit_var
 
-# Dropdown Menü: Signal Type (neue Profile)
-signal_var = tk.StringVar(value="SQU - SQU")
-tk.Label(control_frame, text="Signal Type:", bg="#f0f0f0", font=("Arial", 12)).grid(row=0, column=0, padx=5, pady=5, sticky="w")
+# --- UI Elements in the Control Frame ---
+
+# Signal Type Dropdown (allowed profiles: "Square", "Triangle", "Model")
+signal_var = tk.StringVar(value="Square")
+ttk.Label(control_frame, text="Signal Type:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
 signal_dropdown = ttk.Combobox(control_frame, textvariable=signal_var,
-                               values=["SQU - SQU", "SQU - EXP", "EXP - EXP", "TRI - TRI", "Model"],
+                               values=["Square", "Triangle", "Model"],
                                state="readonly")
-signal_dropdown.grid(row=0, column=1, columnspan=2, padx=0, pady=5)
+signal_dropdown.grid(row=0, column=1, columnspan=2, padx=5, pady=5, sticky="ew")
 
-# Eingabefelder mit Labels und Default-Werten
-drop_amplitude_entry, _ = add_labeled_entry(control_frame, "Drop Amplitude:", 1)
+# Entry fields with labels, default values, and unit selectors.
+drop_amplitude_entry, drop_amplitude_unit = add_labeled_entry(control_frame, "Drop Amplitude:", 1, ["V", "mV"], "V")
 drop_amplitude_entry.insert(0, "1")
 
-amplitude_entry, _ = add_labeled_entry(control_frame, "Amplitude:", 2)
+amplitude_entry, amplitude_unit = add_labeled_entry(control_frame, "Amplitude:", 2, ["V", "mV"], "V")
 amplitude_entry.insert(0, "2")
 
-peaktime_entry, peaktime_unit = add_labeled_entry(control_frame, "Peaktime:", 3, ["ms", "µs"])
+peaktime_entry, peaktime_unit = add_labeled_entry(control_frame, "Peaktime:", 3, ["ms", "µs"], "ms")
 peaktime_entry.insert(0, "3")
 
-droptime_entry, droptime_unit = add_labeled_entry(control_frame, "Droptime:", 4, ["ms", "µs"])
+droptime_entry, droptime_unit = add_labeled_entry(control_frame, "Droptime:", 4, ["ms", "µs"], "ms")
 droptime_entry.insert(0, "7")
 
-delta_t_entry, delta_t_unit = add_labeled_entry(control_frame, "Delta t:", 5, ["ms", "µs"])
+delta_t_entry, delta_t_unit = add_labeled_entry(control_frame, "Delta t:", 5, ["ms", "µs"], "ms")
 delta_t_entry.insert(0, "0")
 
-pulse_width, pulse_unit = add_labeled_entry(control_frame, "Pulse Width:", 6, ["ms"])
-pulse_width.insert(0, "10")
+pulse_width_entry, pulse_unit = add_labeled_entry(control_frame, "Pulse Width:", 6, ["ms"], "ms")
+pulse_width_entry.insert(0, "10")
 
-# Burst-Mode Checkbox
+# Burst-Mode Checkbox.
 burst_var = tk.BooleanVar(value=True)
-burst_check = tk.Checkbutton(control_frame, text="Burst-Mode", variable=burst_var, bg="#f0f0f0", font=("Arial", 12))
+burst_check = ttk.Checkbutton(control_frame, text="Burst-Mode", variable=burst_var)
 burst_check.grid(row=7, column=0, columnspan=2, pady=5, sticky="w")
 
-load_button = tk.Button(control_frame, text="Load Profile", command=lambda: loadProfile(
-                            signal_var.get(),
-                            amplitude_entry.get(),
-                            drop_amplitude_entry.get(),
-                            peaktime_entry.get(), peaktime_unit.get(),
-                            droptime_entry.get(), droptime_unit.get(),
-                            delta_t_entry.get(), delta_t_unit.get(),
-                            burst_var.get(), pulse_width.get()),
-                        bg="#2196F3", fg="white", font=("Arial", 12, "bold"))
-load_button.grid(row=8, column=3, columnspan=1, pady=6)
+def on_load_profile():
+    """
+    Converts all input values to their base units and calls loadProfile.
+    Amplitudes are converted to Volts and time values to milliseconds.
+    """
+    try:
+        amp = pf.safe_float(amplitude_entry.get(), "Amplitude")
+        if amplitude_unit.get() == "mV":
+            amp /= 1000.0
+        
+        drop_amp = pf.safe_float(drop_amplitude_entry.get(), "Drop Amplitude")
+        if drop_amplitude_unit.get() == "mV":
+            drop_amp /= 1000.0
+        
+        peak_time = pf.safe_float(peaktime_entry.get(), "Peaktime")
+        if peaktime_unit.get() == "µs":
+            peak_time /= 1000.0
+        
+        drop_time = pf.safe_float(droptime_entry.get(), "Droptime")
+        if droptime_unit.get() == "µs":
+            drop_time /= 1000.0
+        
+        delta_t = pf.safe_float(delta_t_entry.get(), "Delta t")
+        if delta_t_unit.get() == "µs":
+            delta_t /= 1000.0
+        
+        pulse = pf.safe_float(pulse_width_entry.get(), "Pulse Width")
+        
+        # Call loadProfile with the converted values and pass the UI's ax and canvas.
+        pf.loadProfile(signal_var.get(), amp, drop_amp, peak_time, drop_time, delta_t,
+                       burst_var.get(), pulse, ax, canvas)
+    except Exception as e:
+        messagebox.showerror("Error", f"Conversion error: {str(e)}")
 
-# Send-Button
-send_button = tk.Button(control_frame, text="Send Impuls", 
-                        command=lambda: wf.sendTrigger(),
-                        bg="#4CAF50", fg="white", font=("Arial", 12, "bold"))
-send_button.grid(row=8, column=1, columnspan=1, pady=6)
+# Load Profile Button.
+load_button = ttk.Button(control_frame, text="Load Profile", command=on_load_profile)
+load_button.grid(row=8, column=3, padx=5, pady=6, sticky="ew")
 
-# Reset-Button mit Bestätigungsdialog
-reset_button = tk.Button(control_frame, text="Reset Device", 
-                         command=lambda: messagebox.askyesno("Bestätigung", "Möchten Sie wirklich Erase ausführen?") 
-                         and print("Reset Device: Befehl ausgeführt!"),
-                         bg="#f44336", fg="white", font=("Arial", 12, "bold"))
-reset_button.grid(row=8, column=2, columnspan=1, pady=6)
+# Send Button with custom green style.
+# Assuming wf.sendTrigger is defined elsewhere; if not, this button can be adjusted.
+send_button = ttk.Button(control_frame, text="Send Impuls", command=lambda: print("Send trigger called"), style="Send.TButton")
+send_button.grid(row=8, column=1, padx=5, pady=6, sticky="ew")
+
+def on_reset():
+    """
+    Asks for confirmation before resetting the device.
+    """
+    if messagebox.askyesno("Confirmation", "Do you really want to execute Erase?"):
+        print("Reset Device: Command executed!")
+
+# Reset Button with custom red style.
+reset_button = ttk.Button(control_frame, text="Reset Device", command=on_reset, style="Reset.TButton")
+reset_button.grid(row=8, column=2, padx=5, pady=6, sticky="ew")
 
 root.mainloop()

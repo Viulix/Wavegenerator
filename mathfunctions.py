@@ -10,9 +10,82 @@ def generateSQUSQU(amplitude1, amplitude2, uptime, downtime, periodInMillisecond
         elif uptime <= i < downtime + uptime:
             result.append(-amplitude2)
         else: result.append(0)
-    if returnArray: return  np.array(result)
+    if returnArray: return  np.array(result) # returns array 
     resultString = ",".join(map(str, result))
     return resultString
+
+def dreieck_signal(amp_peak, amp_low, ratio, n_points):
+    """
+    Erzeugt ein Signal mit folgendem Verlauf:
+      1. Anstieg von 0 auf amp_peak
+      2. Direkter Übergang von amp_peak zu amp_low
+      3. Rücklauf von amp_low zu 0
+      
+    Der Parameter ratio bestimmt den Anteil der Gesamtpunkte (abzüglich 2 fester Punkte für den Übergang)
+    für den oberen Teil (0 -> Peak) gegenüber dem unteren Teil (Low -> 0).
+    
+    :param amp_peak: Amplitude des Peaks (Maximum)
+    :param amp_low:  Amplitude des Tiefs (Minimum, z.B. negativ)
+    :param ratio: Anteil der Punkte für den oberen Teil (0 < ratio < 1)
+    :param n_points: Gesamtzahl der Punkte im Signal (mindestens 4)
+    :return: NumPy-Array mit dem Signal
+    """
+    if n_points < 4:
+        raise ValueError("n_points muss mindestens 4 sein.")
+    
+    # Fixer Anteil für den direkten Übergang von amp_peak zu amp_low:
+    n_middle = 2  # Enthält amp_peak und amp_low
+    n_remaining = n_points - n_middle
+    
+    # Punkteaufteilung für den oberen (0 -> amp_peak) und unteren (amp_low -> 0) Teil:
+    n_upper = int(n_remaining * ratio)
+    n_lower = n_remaining - n_upper
+    
+    # Sicherstellen, dass beide Segmente mindestens 1 Punkt enthalten:
+    if n_upper < 1:
+        n_upper = 1
+        n_lower = n_remaining - 1
+    if n_lower < 1:
+        n_lower = 1
+        n_upper = n_remaining - 1
+
+    # Segment 1: von 0 bis amp_peak (n_upper+1 Punkte, inkl. Start und Peak)
+    seg1 = np.linspace(0, amp_peak, n_upper+1, endpoint=True)
+    # Segment 2: Übergang von amp_peak zu amp_low (n_middle Punkte, inkl. beider Endpunkte)
+    seg2 = np.linspace(amp_peak, amp_low, n_middle, endpoint=True)
+    # Segment 3: von amp_low zurück zu 0 (n_lower+1 Punkte, inkl. Low und Endpunkt)
+    seg3 = np.linspace(amp_low, 0, n_lower+1, endpoint=True)
+    
+    # An den Übergängen würden sonst Punkte doppelt vorkommen.
+    # Daher entfernen wir das erste Element von seg2 und seg3:
+    signal = np.concatenate([seg1, seg2[1:], seg3[1:]])
+    return signal
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def neuron_action_potential(A, B, a, b, xa, xb, points=10000, start=0, end=7, plot=False):
+    """
+    Model for a neuronal spike. This model works with two differently shaped exponential that are superpositioned to achieve a good pulseform. 
+    A, B: Amplitudes of the exponentials. A for spike, B for drop. NOTE: B is the actual amplitude of the drop. A is only barely the amplitude of the peak due to superposition.
+    a, b: Stretch factor for each spike. a > 1 and b < 1 normally.
+    xa, xb: Time shift for each pulse. Must be used and should not be the same.
+
+    """
+    x = np.linspace(start, end, points)
+    firstExponential = A*np.exp(-(a*x-xa)**2)
+    secondExponential = B*np.exp(-(b*x-xb)**2)
+    y = firstExponential + secondExponential
+    if plot:
+        plt.figure(figsize=(8, 4))
+        plt.plot(x, y, label="Model View")
+        plt.legend()
+        plt.grid()
+        plt.show()
+    return y
+
+# Simulation ausführen
+# neuron_action_potential(10, -3, 2, .85, 3, 3, plot=True)
 
 
 
@@ -31,16 +104,6 @@ def getPulseDifferenceAsString(puls1, puls2, delta=0):
 
 def getPulseDifference(pulse, delta=0):
     """
-    Berechnet die Differenz zwischen einem Puls und einem um delta verschobenen Puls.
-    Der verschobene Puls wird mit 0 erweitert, sodass das Ergebnis die korrekte Länge hat.
-    
-    Parameter:
-    - pulse: NumPy-Array, das den ursprünglichen Puls enthält.
-    - delta: Ganzzahl, die die Verschiebung des zweiten Pulses bestimmt
-             (positiv = nach rechts, negativ = nach links).
-    
-    Rückgabe:
-    - NumPy-Array mit der differenzierten Pulsfolge.
     """
     pulse = np.asarray(pulse)  # Sicherstellen, dass pulse ein NumPy-Array ist
     original_length = len(pulse)
@@ -65,9 +128,9 @@ def getPulseDifference(pulse, delta=0):
 
     return extended_pulse - shifted_pulse
 
-def modelFunction(x):
+def modelFunction(x, A, B, C):
     """Returns a hard coded function of x. Used for calculation purposes. Only change, if you want to change the plot."""
-    f = 20 * np.exp(.1 * np.log(abs(x)) - (x)**2)- 2*np.exp(-.02*(x)**2)
+    f = A * np.exp(-.5 *(x-2.94)**2)- B*np.exp(-.02*(x-7.94)**2) + C*np.exp(-.02 * (x+4.06)**2)
     return f
 
 def sendMathFunction(smu, datastr: str):
