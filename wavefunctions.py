@@ -81,8 +81,8 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
         pulseDiff = mf.getPulseDifference(pulse, int(delta_t))
         normPulse = mf.normalizePulse(pulseDiff)
         datastring = ",".join(map(str, normPulse))
-       # sendAndSaveCustom("0," + datastring)
-       # time.sleep(loadTimeSeconds)
+        sendAndSaveCustom("0," + datastring)
+        time.sleep(loadTimeSeconds)
         # Update the embedded plot with the normalized pulse.
         updatePlot(ax, canvas, normPulse * maxVoltage, float(pulseWidth))
 
@@ -96,15 +96,15 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
         updatePlot(ax, canvas, pulse, float(pulseWidth))
         
     elif signal_type == "Model":
-        # datastring = mf.normalize_and_format_function(mf.modelFunction(), 24000, 0.001, 12)
-        # Generate x-values for the model function
-        x_values = np.linspace(0.001, 20, 1000)  # Define an appropriate range
+        x_values = np.linspace(0, 20, 1000)  # Define an appropriate range
         pulse = mf.modelFunction(x_values, amplitude, drop_amplitude, 0.503)  # Compute y-values
-        print(pulse)
+        nom_pulse = mf.normalizePulse(pulse)
+        datastring = ",".join(map(lambda x: f"{x:.3f}", nom_pulse))
+        print(datastring)
         maxVoltage = max(abs(pulse))
        # print(datastring)
-       # sendAndSaveCustom(20, 2, datastring)
-       # time.sleep(loadTimeSeconds)
+        sendAndSaveCustom("0," + datastring)
+        time.sleep(loadTimeSeconds)
         updatePlot(ax, canvas, pulse, float(pulseWidth))
     
     else:
@@ -115,8 +115,8 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     # If burst mode is enabled, prepare the trigger.
     if burst:
         print("Preparing the trigger mode")
-      #  prepareTrigger(frequency, maxVoltage)
-      #  time.sleep(3)
+        prepareTrigger(frequency, maxVoltage)
+        time.sleep(3)
         
     print("Profile has been loaded.")
 

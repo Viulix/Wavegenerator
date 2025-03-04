@@ -97,15 +97,21 @@ droptime_entry, droptime_unit = add_labeled_entry(control_frame, "Droptime:", 4,
 droptime_entry.insert(0, "7")
 
 delta_t_entry, delta_t_unit = add_labeled_entry(control_frame, "Delta t:", 5, ["ms", "µs"], "ms")
-delta_t_entry.insert(0, "0")
+delta_t_entry.insert(0, "1")
 
 pulse_width_entry, pulse_unit = add_labeled_entry(control_frame, "Pulse Width:", 6, ["ms"], "ms")
 pulse_width_entry.insert(0, "10")
 
+reset_amplitude_entry, reset_amplitude_unit = add_labeled_entry(control_frame, "Reset Amplitude:", 7, ["V", "mV"], "V")
+reset_amplitude_entry.insert(0, "0.5")  # Standardwert
+
+reset_duration_entry, reset_duration_unit = add_labeled_entry(control_frame, "Reset Duration:", 8, ["ms"], "ms")
+reset_duration_entry.insert(0, "50")  # Standardwert
+
 # Burst-Mode Checkbox.
 burst_var = tk.BooleanVar(value=True)
 burst_check = ttk.Checkbutton(control_frame, text="Burst-Mode", variable=burst_var)
-burst_check.grid(row=7, column=0, columnspan=2, pady=5, sticky="w")
+burst_check.grid(row=10, column=0, columnspan=2, pady=5, sticky="w")
 
 def on_load_profile():
     """
@@ -143,22 +149,22 @@ def on_load_profile():
 
 # Load Profile Button.
 load_button = ttk.Button(control_frame, text="Load Profile", command=on_load_profile)
-load_button.grid(row=8, column=3, padx=5, pady=6, sticky="ew")
+load_button.grid(row=10, column=3, padx=5, pady=6, sticky="ew")
 
 # Send Button with custom green style.
 # Assuming wf.sendTrigger is defined elsewhere; if not, this button can be adjusted.
-send_button = ttk.Button(control_frame, text="Send Impuls", command=lambda: print("Send trigger called"), style="Send.TButton")
-send_button.grid(row=8, column=1, padx=5, pady=6, sticky="ew")
+send_button = ttk.Button(control_frame, text="Send Impuls", command=lambda: pf.sendTrigger(), style="Send.TButton")
+send_button.grid(row=10, column=1, padx=5, pady=6, sticky="ew")
 
 def on_reset():
     """
     Asks for confirmation before resetting the device.
     """
     if messagebox.askyesno("Confirmation", "Do you really want to execute Erase?"):
-        print("Reset Device: Command executed!")
+        pf.sendCustom() # to be implemented
 
 # Reset Button with custom red style.
 reset_button = ttk.Button(control_frame, text="Reset Device", command=on_reset, style="Reset.TButton")
-reset_button.grid(row=8, column=2, padx=5, pady=6, sticky="ew")
+reset_button.grid(row=10, column=2, padx=5, pady=6, sticky="ew")
 
 root.mainloop()
