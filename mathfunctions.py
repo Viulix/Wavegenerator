@@ -73,8 +73,8 @@ def neuron_action_potential(A, B, a, b, xa, xb, points=10000, start=0, end=7, pl
 
     """
     x = np.linspace(start, end, points)
-    firstExponential = A*np.exp(-(a*x-xa)**2)
-    secondExponential = B*np.exp(-(b*x-xb)**2)
+    firstExponential = A*np.exp(-.5*(10*a*x-xa)**2)
+    secondExponential = B*np.exp(-(10*b*x-xb)**2)
     y = firstExponential + secondExponential
     if plot:
         plt.figure(figsize=(8, 4))
@@ -91,6 +91,8 @@ def neuron_action_potential(A, B, a, b, xa, xb, points=10000, start=0, end=7, pl
 
 def getPulseDifferenceAsString(puls1, puls2, delta=0):
     """Generates the difference between two pulses as a string."""
+    print(puls1)
+    print(puls2)
     newPuls1 = [0] * delta + str.split(puls1, ",")
     newPuls2 = str.split(puls2, ",") + [0] * delta
     
@@ -116,6 +118,7 @@ def getPulseDifference(pulse, delta=0):
     extended_pulse = np.zeros(new_length)
     shifted_pulse = np.zeros(new_length)
 
+
     # Originalen Puls an den Anfang des neuen Arrays kopieren
     extended_pulse[:original_length] = pulse
 
@@ -125,7 +128,8 @@ def getPulseDifference(pulse, delta=0):
     elif delta < 0:
         # Linksverschiebung: Kopiere Pulse um -delta nach links
         shifted_pulse[:original_length] = pulse[-delta:]  # Kürze vorne, falls nötig
-
+    print(extended_pulse)
+    print(shifted_pulse)
     return extended_pulse - shifted_pulse
 
 def modelFunction(x, A, B, C):
@@ -150,7 +154,7 @@ def normalize_and_format_function(func, sampleNumber: int, a, b):
     max_value = np.max(y_values)
 
     maximumValue = np.max([abs(min_value), abs(max_value)])
-
+    print(maximumValue)
     normalized_values = y_values / maximumValue
     
     # Create string for the wave generator
@@ -162,9 +166,11 @@ def normalize_and_format_function(func, sampleNumber: int, a, b):
 def normalizePulse(pulse):
     """Finds the maximum value of the function and normalizes it based on this. Output will be a pulse with max = 1/-1"""
     pulse = np.array(pulse)
+    print(pulse)
     max = np.max(pulse)
     min = np.min(pulse)
-
+    print("Max:", [abs(min), abs(max)])
     maximumValue = np.max([abs(min), abs(max)])
+    print(maximumValue)
     if maximumValue == 0: return pulse
     return  pulse / maximumValue
