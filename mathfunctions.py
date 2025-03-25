@@ -174,3 +174,55 @@ def normalizePulse(pulse):
     print(maximumValue)
     if maximumValue == 0: return pulse
     return  pulse / maximumValue
+
+def createArbString(pulse):
+    """
+    Converts the desired output voltages into a normalized waveform string for the 33220A.
+    The device expects the arbitrary waveform data to be in the range [-1, 1]. 
+    The function calculates the amplitude (Vpp) and DC offset from the input pulse,
+    then transforms the pulse so that when the waveform is scaled by these parameters,
+    the output exactly matches the desired voltages.
+    
+    For a pulse [2, 0, -1]:
+        - Amplitude (Vpp) = max - min = 2 - (-1) = 3 V
+        - DC Offset = (max + min) / 2 = (2 + (-1)) / 2 = 0.5 V
+        - Normalized value for each point is calculated as:
+              normalized_value = (value - offset) / (amplitude/2)
+          This maps the maximum (2V) to +1 and the minimum (-1V) to -1.
+          For example:
+              For 2V: (2 - 0.5) / (3/2) = 1.0
+              For 0V: (0 - 0.5) / (3/2) ≈ -0.333333
+              For -1V: (-1 - 0.5) / (3/2) = -1.0
+    
+    Parameters:
+        pulse (list or array-like): The desired output voltages.
+    
+    Returns:
+        tuple: A tuple containing:
+            - normalized_str (str): The normalized waveform as a comma-separated string.
+            - amplitude (float): The calculated peak-to-peak amplitude.
+            - offset (float): The calculated DC offset.
+    """
+    # Convert the input pulse to a numpy array of floats
+    pulse = np.array(pulse, dtype=float)
+    
+    # Determine the minimum and maximum values in the pulse
+    pulse_min = np.min(pulse)
+    pulse_max = np.max(pulse)
+    
+    # Calculate the amplitude (Vpp) and DC offset
+    amplitude = pulse_max - pulse_min
+    offset = (pulse_max + pulse_min) / 2.0
+    
+    # Avoid division by zero if the pulse is constant
+    if amplitude == 0:
+        raise ValueError("Pulse has zero amplitude; cannot normalize.")
+    
+    # Normalize the pulse to the range [-1, 1] using the derived amplitude and offset
+    norm_pulse = (pulse - offset) / (amplitude / 2)
+    
+    # Format the normalized values as a comma-separated string (you can adjust the precision if needed)
+    normalized_str = ','.join(f'{x:.6f}' for x in norm_pulse)
+    
+    return normalized_str, amplitude, offset
+

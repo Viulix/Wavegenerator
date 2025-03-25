@@ -9,12 +9,6 @@ rm = pyvisa.ResourceManager()
 defaultProfile = "ROUVEN"
 loadTimeSeconds = 7
 triggerActive = False
-# Dummy implementations for functions assumed to exist.
-def sendAndSaveCustom(*args, **kwargs):
-    print("sendAndSaveCustom called with", args, kwargs)
-    
-def prepareTrigger(frequency, maxVoltage):
-    print("prepareTrigger called with frequency:", frequency, "maxVoltage:", maxVoltage)
 
 def safe_float(value_str, field_name="Value"):
     """
@@ -84,6 +78,8 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     """
     pulseWidth = peaktime + droptime
     frequency = (1 / (float(peaktime + droptime) + delta_t)) * 10**3
+    amplitdueVpp = 1
+    offset = 0
     pulse = None
     maxVoltage = None
 
@@ -95,7 +91,9 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
         pulseDiff = mf.getPulseDifference(pulse, int(delta_t))
         normPulse = mf.normalizePulse(pulseDiff)
         datastring = ",".join(map(str, normPulse))
-        print(datastring)
+
+        datastring, amplitdueVpp, offset = mf.createArbString(pulseDiff)
+
         sendAndSaveCustom("0," + datastring)
         time.sleep(loadTimeSeconds)
         # Update the embedded plot with the normalized pulse.
@@ -129,8 +127,7 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     # If burst mode is enabled, prepare the trigger.
     if burst:
         print("Preparing the trigger mode")
-        print(amplitude + drop_amplitude)
-        prepareTrigger(frequency, maxVoltage * 2)
+        prepareTrigger(frequency, amplitude=amplitdueVpp/2, offset=offset)
         time.sleep(3)
         global triggerActive
         triggerActive = True
@@ -196,6 +193,8 @@ def writeAndSaveCustom(signal_str:str):
     smu.close()
 
 def sendReset(durationSeconds:int, amplitude):
+    """Sends a reset command to the generator.
+    Current implementation: DC Voltage for specified time and amplitude."""
     smu = rm.open_resource('ASRL6::INSTR')
     smu.write(f"APPL:DC DEF, DEF, {amplitude}")
     time.sleep(durationSeconds)
