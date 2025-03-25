@@ -7,8 +7,8 @@ import numpy as np
 # Global load time (in seconds) for waiting after sending the pulse.
 rm = pyvisa.ResourceManager()
 defaultProfile = "ROUVEN"
-loadTimeSeconds = 7
-triggerActive = False
+loadTimeSeconds = 6
+numberScaleFactor = 200
 
 def safe_float(value_str, field_name="Value"):
     """
@@ -58,7 +58,7 @@ def updatePlot(ax, canvas, pulse, pulseWidth, type="DEF"):
         ax.set_title("Loaded Pulse")
     canvas.draw()
 
-def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delta_t, burst, ax, canvas):
+def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delta_t, burst, singlePulse, ax, canvas):
     """
     Sends the pulse based on the provided parameters.
     Evaluates the signal type and performs different actions,
@@ -85,19 +85,18 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
 
     if signal_type == "Square":
         # Generate the square pulse using the provided parameters.
-        pulse = mf.generateSQUSQU(float(amplitude), float(drop_amplitude), peaktime, droptime, float(pulseWidth))
-        frequency = (1 / (float(pulseWidth) + delta_t + 1)) * 10**3
-        maxVoltage = max(abs(pulse))
-        pulseDiff = mf.getPulseDifference(pulse, int(delta_t))
-        normPulse = mf.normalizePulse(pulseDiff)
-        datastring = ",".join(map(str, normPulse))
+        pulse = mf.generateSQUSQU(float(amplitude), float(drop_amplitude), peaktime, droptime, float(pulseWidth), numberScaleFactor)
+        # Check if the user want a  difference-pulse or a single pulse
+        if singlePulse:
+            pulseDiff = pulse
+            frequency = (1 / (float(peaktime + droptime))) * 10**3
+        else: pulseDiff = mf.getPulseDifference(pulse, int(delta_t)*numberScaleFactor)
+        datastring, amplitdueVpp, offset = mf.createArbString(pulseDiff, 0)
 
-        datastring, amplitdueVpp, offset = mf.createArbString(pulseDiff)
-
-        sendAndSaveCustom("0," + datastring)
+        sendAndSaveCustom(datastring)
         time.sleep(loadTimeSeconds)
         # Update the embedded plot with the normalized pulse.
-        updatePlot(ax, canvas, normPulse * maxVoltage, float(pulseWidth), "SQU")
+        updatePlot(ax, canvas, pulseDiff, float(pulseWidth), "SQU")
 
     elif signal_type == "Triangle":
         print("Action: TRIANGLE is executed (e.g., triangular pulse in both phases).")
@@ -121,13 +120,12 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     
     else:
         print("Unknown type!")
-        updatePlot(ax, canvas, None, float(pulseWidth))
         return
 
     # If burst mode is enabled, prepare the trigger.
     if burst:
         print("Preparing the trigger mode")
-        prepareTrigger(frequency, amplitude=amplitdueVpp/2, offset=offset)
+        prepareTrigger(frequency, amplitude=amplitdueVpp/2, offset=offset/2)
         time.sleep(3)
         global triggerActive
         triggerActive = True
@@ -152,28 +150,25 @@ def sendAndSaveCustom(customDatastring):
 def prepareTrigger(frequency, amplitude, offset=0, cycle_count=1, start_phase=0):
     """Applies the default settings for the Burst-Mode and applies the mode."""
     smu = rm.open_resource('ASRL6::INSTR')
-    smu.write(f"BURS:NCYC {cycle_count}")
-    smu.write(f"BURS:PHAS {start_phase}")
-    smu.write("BURS:MODE TRIG")
-    smu.write("TRIG:SOUR BUS")
-    smu.write("BURS:STAT ON")
     smu.write(f"FREQ {frequency}")      # Setzt die Frequenz
     smu.write(f"VOLT {amplitude}")      # Setzt die Amplitude
     smu.write(f"VOLT:UNIT VPP")      # Setzt die Amplitude 
     smu.write(f"VOLT:OFFS {offset}")    # Setzt den DC-Offset
     smu.write(f"FUNC:USER {defaultProfile}")  # Wählt das USER-Wellenform-Profil aus
+    smu.write(f"BURS:NCYC {cycle_count}")
+    smu.write(f"BURS:PHAS {start_phase}")
+    smu.write("BURS:MODE TRIG")
+    smu.write("TRIG:SOUR BUS")
+    smu.write("BURS:STAT ON")
     smu.close()
 
 def sendTrigger():
     """Sends a single external trigger. Only works in Burst-Mode"""
-    if triggerActive:
-        print("Sending trigger:")
-        smu = rm.open_resource('ASRL6::INSTR')
-        smu.write("*TRG")
-        smu.close()
-        time.sleep(0.1)
-    else:
-        print("No trigger profile has been prepared.")
+    print("Sending trigger:")
+    smu = rm.open_resource('ASRL6::INSTR')
+    smu.write("*TRG")
+    smu.close()
+    time.sleep(0.1)
 
 def sendCustom(signal_str:str, frequency, amplitude, offset=0):
     """Sends and applies a custome signal string - also stores the pulsform."""
@@ -192,13 +187,29 @@ def writeAndSaveCustom(signal_str:str):
     smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
     smu.close()
 
-def sendReset(durationSeconds:int, amplitude):
-    """Sends a reset command to the generator.
-    Current implementation: DC Voltage for specified time and amplitude."""
+def sendReset(durationSeconds: int, amplitude: float):
+    """Temporarily sets the generator to DC voltage for the specified time and amplitude,
+    then restores the previous waveform without overwriting any user-defined profiles."""
+    
     smu = rm.open_resource('ASRL6::INSTR')
-    smu.write(f"APPL:DC DEF, DEF, {amplitude}")
-    time.sleep(durationSeconds)
-    smu.write("BURS:MODE TRIG")
-    smu.write("BURS:STAT ON")
-    smu.write(f"FUNC:USER {defaultProfile}")  # Wählt das USER-Wellenform-Profil aus
-    smu.close()
+    
+    try:
+        # Speichere den aktuellen Zustand
+        previous_function = smu.query("FUNC?").strip()  # Aktuelle Wellenform
+        previous_amplitude = smu.query("VOLT?").strip()  # Aktuelle Amplitude
+        previous_offset = smu.query("VOLT:OFFS?").strip()  # Aktueller Offset
+        
+        # Setze DC-Spannung mit gewünschter Amplitude
+        smu.write("FUNC DC")  # Setzt DC-Modus
+        smu.write(f"VOLT:OFFS {float(amplitude)/2}")  # Setzt den Offset auf die gewünschte DC-Spannung
+        
+        time.sleep(durationSeconds)  # Wartezeit für die DC-Phase
+        
+        # Kehre zum vorherigen Zustand zurück
+        smu.write(f"FUNC {previous_function}")  # Setzt die vorherige Wellenform
+        smu.write(f"VOLT {previous_amplitude}")  # Stellt die vorherige Amplitude wieder her
+        smu.write(f"VOLT:OFFS {previous_offset}")  # Stellt den vorherigen Offset wieder her
+        smu.write("BURS:STAT ON")
+
+    finally:
+        smu.close()
