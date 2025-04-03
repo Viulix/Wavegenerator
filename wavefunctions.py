@@ -9,6 +9,8 @@ rm = pyvisa.ResourceManager()
 defaultProfile = "ROUVEN"
 loadTimeSeconds = 6
 numberScaleFactor = 200
+usbPort = 6
+pyvisaAdress = f"ASRL{usbPort}::INSTR"
 
 def safe_float(value_str, field_name="Value"):
     """
@@ -133,15 +135,15 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     print("Profile has been loaded.")
 
 def turnOnOutput():
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write("OUTP ON")
 
 def turnOffOutput():
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write("OUTP OFF")
 
 def sendAndSaveCustom(customDatastring):
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write(f"DATA VOLATILE, {customDatastring}") # Write arbitary waveform in volatile memory of the device
     smu.write(f"DATA:COPY {defaultProfile}, VOLATILE")  # Copy the waveform into a profile (here ARB3)
     smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
@@ -149,7 +151,7 @@ def sendAndSaveCustom(customDatastring):
 
 def prepareTrigger(frequency, amplitude, offset=0, cycle_count=1, start_phase=0):
     """Applies the default settings for the Burst-Mode and applies the mode."""
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write(f"FREQ {frequency}")      # Setzt die Frequenz
     smu.write(f"VOLT {amplitude}")      # Setzt die Amplitude
     smu.write(f"VOLT:UNIT VPP")      # Setzt die Amplitude 
@@ -165,14 +167,14 @@ def prepareTrigger(frequency, amplitude, offset=0, cycle_count=1, start_phase=0)
 def sendTrigger():
     """Sends a single external trigger. Only works in Burst-Mode"""
     print("Sending trigger:")
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write("*TRG")
     smu.close()
     time.sleep(0.1)
 
 def sendCustom(signal_str:str, frequency, amplitude, offset=0):
     """Sends and applies a custome signal string - also stores the pulsform."""
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write(f"DATA VOLATILE, {signal_str}") # Write arbitary waveform in volatile memory of the device
     smu.write(f"DATA:COPY {defaultProfile}, VOLATILE")  # Copy the waveform into a profile (here ARB3)
     smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
@@ -181,7 +183,7 @@ def sendCustom(signal_str:str, frequency, amplitude, offset=0):
 
 def writeAndSaveCustom(signal_str:str):
     """Send a custom signal string and load it into a profile of the generator. Does not apply the profile."""
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     smu.write(f"DATA VOLATILE, {signal_str}") # Write arbitary waveform in volatile memory of the device
     smu.write(f"DATA:COPY {defaultProfile}, VOLATILE")  # Copy the waveform into a profile (here ARB3)
     smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
@@ -191,7 +193,7 @@ def sendReset(durationSeconds: int, amplitude: float):
     """Temporarily sets the generator to DC voltage for the specified time and amplitude,
     then restores the previous waveform without overwriting any user-defined profiles."""
     
-    smu = rm.open_resource('ASRL6::INSTR')
+    smu = rm.open_resource(pyvisaAdress)
     
     try:
         # Speichere den aktuellen Zustand

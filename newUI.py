@@ -5,7 +5,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-
+from tkinter import simpledialog, messagebox
 # --- Import Custom Wavefunctions Module ---
 import wavefunctions as pf
 
@@ -13,7 +13,13 @@ import wavefunctions as pf
 output_state = False
 triggerActive = False
 # --- Callback Functions ---
-
+def get_usb_port():
+    port = simpledialog.askstring("USB Port", "What USB-Port are you using? (e.g 6 if you use COM6)")
+    if port:
+        messagebox.showinfo("USB Port is set", f"You are using: COM{port}")
+        pf.usbPort = int(port)
+    else:
+        messagebox.showwarning("No Port", "No valid port.")
 def on_load_profile():
     """
     Converts all input values to their base units and calls loadProfile.
@@ -87,6 +93,9 @@ def toggle_output():
 
 # Create the main window
 root = tk.Tk()
+root.withdraw()  # Versteckt das Hauptfenster während der Abfrage
+get_usb_port()  # Fragt den USB-Port ab
+root.deiconify()
 root.title("Signal Sender")
 root.geometry("1100x500")
 root.minsize(800, 500)
@@ -223,8 +232,7 @@ output_button = ttk.Button(control_frame, text="Output", command=toggle_output, 
 output_button.grid(row=13, column=2, padx=5, pady=6, sticky="ew")
 
 # Ensure the output is turned off at startup.
-pf.turnOffOutput()
+# pf.turnOffOutput()
 
 # --- Main Event Loop ---
-
 root.mainloop()
