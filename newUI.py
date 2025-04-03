@@ -232,7 +232,7 @@ output_button = ttk.Button(control_frame, text="Output", command=toggle_output, 
 output_button.grid(row=13, column=2, padx=5, pady=6, sticky="ew")
 
 # Ensure the output is turned off at startup.
-# pf.turnOffOutput()
+pf.turnOffOutput()
 
 # --- Main Event Loop ---
 root.mainloop()
