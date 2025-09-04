@@ -1,16 +1,15 @@
 import mathfunctions as mf
 import pyvisa
 import time
-import matplotlib.pyplot as plt
 import numpy as np
 
 # Global load time (in seconds) for waiting after sending the pulse.
-rm = pyvisa.ResourceManager()
-defaultProfile = "ROUVEN"
-loadTimeSeconds = 6
-numberScaleFactor = 200
-usbPort = 6
-pyvisaAdress = f"ASRL{usbPort}::INSTR"
+rm = pyvisa.ResourceManager() # Global variable for the pyvisa resource manager
+defaultProfile = "ROUVEN" # Default profile to store the custom waveform. We are only using one profile and overwrite it each time.
+loadTimeSeconds = 6 # Time to wait after loading a profile
+numberScaleFactor = 200 # Factor to scale the number of points in the waveform. 
+usbPort = 6  # USB Port where the device is connected. Check in device manager. This value will be overwritten in the GUI.
+pyvisaAdress = f"ASRL{usbPort}::INSTR" # global variable for the pyvisa adress of the connected device
 
 def safe_float(value_str, field_name="Value"):
     """
@@ -60,7 +59,7 @@ def updatePlot(ax, canvas, pulse, pulseWidth, type="DEF"):
         ax.set_title("Loaded Pulse")
     canvas.draw()
 
-def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delta_t, burst, singlePulse, ax, canvas):
+def loadProfile(signal_type, spike_amplitude, ref_amplitude, spike_time, ref_time, delta_t, burst, singlePulse, ax, canvas):
     """
     Sends the pulse based on the provided parameters.
     Evaluates the signal type and performs different actions,
@@ -68,30 +67,29 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     
     Parameters:
       signal_type (str): The type of signal ("Square", "Triangle", "Model").
-      amplitude (float): Amplitude in Volts.
-      drop_amplitude (float): Drop amplitude in Volts.
-      peaktime (float): Peaktime in milliseconds.
-      droptime (float): Droptime in milliseconds.
+      spike_amplitude (float): Amplitude in Volts.
+      ref_amplitude (float): Reference amplitude in Volts.
+      spike_time (float): Peaktime in milliseconds.
+      ref_time (float): Reference time in milliseconds.
       delta_t (float): Delta time in milliseconds.
       burst (bool): Whether burst mode is enabled.
       pulseWidth (float): Pulse width in milliseconds.
       ax (matplotlib.axes.Axes): The axes to update.
       canvas (FigureCanvasTkAgg): The canvas to redraw.
     """
-    pulseWidth = peaktime + droptime
-    frequency = (1 / (float(peaktime + droptime) + delta_t)) * 10**3
+    pulseWidth = spike_time + ref_time
+    frequency = (1 / (float(spike_time + ref_time) + delta_t)) * 10**3
     amplitdueVpp = 1
     offset = 0
     pulse = None
-    maxVoltage = None
 
     if signal_type == "Square":
         # Generate the square pulse using the provided parameters.
-        pulse = mf.generateSQUSQU(float(amplitude), float(drop_amplitude), peaktime, droptime, float(pulseWidth), numberScaleFactor)
+        pulse = mf.generateSQUSQU(float(spike_amplitude), float(ref_amplitude), spike_time, ref_time, float(pulseWidth), numberScaleFactor)
         # Check if the user want a  difference-pulse or a single pulse
         if singlePulse:
             pulseDiff = pulse
-            frequency = (1 / (float(peaktime + droptime))) * 10**3
+            frequency = (1 / (float(spike_time + ref_time))) * 10**3
         else: pulseDiff = mf.getPulseDifference(pulse, int(delta_t)*numberScaleFactor)
         datastring, amplitdueVpp, offset = mf.createArbString(pulseDiff, 0)
 
@@ -99,19 +97,10 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
         time.sleep(loadTimeSeconds)
         # Update the embedded plot with the normalized pulse.
         updatePlot(ax, canvas, pulseDiff, float(pulseWidth), "SQU")
-
-    elif signal_type == "Triangle":
-        print("Action: TRIANGLE is executed (e.g., triangular pulse in both phases).")
-        # For demonstration, generate a dummy triangular pulse.
-        N = 100  # number of points for half the pulse
-        rising = np.linspace(0, 1, N)
-        falling = np.linspace(1, 0, N)
-        pulse = np.concatenate((rising, falling))
-        updatePlot(ax, canvas, pulse, float(pulseWidth))
         
     elif signal_type == "Model":
         x_values = np.linspace(0, 20, 1000)  # Define an appropriate range
-        pulse = mf.modelFunction(x_values, amplitude, drop_amplitude, 0.05)  # Compute y-values
+        pulse = mf.modelFunction(x_values, spike_amplitude, ref_amplitude, 0.05)  # Compute y-values
         nom_pulse = mf.normalizePulse(pulse)
         datastring = ",".join(map(lambda x: f"{x:.3f}", nom_pulse))
         maxVoltage = max(abs(pulse))
@@ -135,14 +124,17 @@ def loadProfile(signal_type, amplitude, drop_amplitude, peaktime, droptime, delt
     print("Profile has been loaded.")
 
 def turnOnOutput():
+    """Turns on the output of the generator without changing any settings."""
     smu = rm.open_resource(pyvisaAdress)
     smu.write("OUTP ON")
 
 def turnOffOutput():
+    """Turns off the output of the generator without changing any settings."""
     smu = rm.open_resource(pyvisaAdress)
     smu.write("OUTP OFF")
 
 def sendAndSaveCustom(customDatastring):
+    """Sends and applies a custome signal string - also stores the pulsform. Does not apply the profile directly."""
     smu = rm.open_resource(pyvisaAdress)
     smu.write(f"DATA VOLATILE, {customDatastring}") # Write arbitary waveform in volatile memory of the device
     smu.write(f"DATA:COPY {defaultProfile}, VOLATILE")  # Copy the waveform into a profile (here ARB3)
@@ -152,16 +144,16 @@ def sendAndSaveCustom(customDatastring):
 def prepareTrigger(frequency, amplitude, offset=0, cycle_count=1, start_phase=0):
     """Applies the default settings for the Burst-Mode and applies the mode."""
     smu = rm.open_resource(pyvisaAdress)
-    smu.write(f"FREQ {frequency}")      # Setzt die Frequenz
-    smu.write(f"VOLT {amplitude}")      # Setzt die Amplitude
-    smu.write(f"VOLT:UNIT VPP")      # Setzt die Amplitude 
-    smu.write(f"VOLT:OFFS {offset}")    # Setzt den DC-Offset
-    smu.write(f"FUNC:USER {defaultProfile}")  # Wählt das USER-Wellenform-Profil aus
-    smu.write(f"BURS:NCYC {cycle_count}")
-    smu.write(f"BURS:PHAS {start_phase}")
-    smu.write("BURS:MODE TRIG")
-    smu.write("TRIG:SOUR BUS")
-    smu.write("BURS:STAT ON")
+    smu.write(f"FREQ {frequency}")      # Set the frequency
+    smu.write(f"VOLT {amplitude}")      # Set the amplitude
+    smu.write(f"VOLT:UNIT VPP")      # Set the amplitude unit
+    smu.write(f"VOLT:OFFS {offset}")    # Set the DC offset
+    smu.write(f"FUNC:USER {defaultProfile}")  # Select the USER waveform profile
+    smu.write(f"BURS:NCYC {cycle_count}") # Set the number of cycles
+    smu.write(f"BURS:PHAS {start_phase}") # Set the start phase
+    smu.write("BURS:MODE TRIG") # Set the burst mode to trigger
+    smu.write("TRIG:SOUR BUS") # Set the source of the trigger (basically tell the device how we send the trigger)
+    smu.write("BURS:STAT ON") # Turn on the burst mode
     smu.close()
 
 def sendTrigger():
@@ -172,23 +164,17 @@ def sendTrigger():
     smu.close()
     time.sleep(0.1)
 
+# This function is not really used, because it won't work with impulses as it tries to apply it immediately. However, in trigger mode it is not possible. Might be useful for other applications.
 def sendCustom(signal_str:str, frequency, amplitude, offset=0):
     """Sends and applies a custome signal string - also stores the pulsform."""
     smu = rm.open_resource(pyvisaAdress)
     smu.write(f"DATA VOLATILE, {signal_str}") # Write arbitary waveform in volatile memory of the device
     smu.write(f"DATA:COPY {defaultProfile}, VOLATILE")  # Copy the waveform into a profile (here ARB3)
     smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
-    smu.write(f"APPL:USER {frequency}, {amplitude}, {offset}") # Activate Profile
+    smu.write(f"APPL:USER {frequency}, {amplitude}, {offset}") # Apply the profile with the given parameters -> would change the output immediately
     smu.close()
 
-def writeAndSaveCustom(signal_str:str):
-    """Send a custom signal string and load it into a profile of the generator. Does not apply the profile."""
-    smu = rm.open_resource(pyvisaAdress)
-    smu.write(f"DATA VOLATILE, {signal_str}") # Write arbitary waveform in volatile memory of the device
-    smu.write(f"DATA:COPY {defaultProfile}, VOLATILE")  # Copy the waveform into a profile (here ARB3)
-    smu.write(f"FUNC:USER {defaultProfile}")  # Activate the profile for the User Mode
-    smu.close()
-
+### NOTE: The save wasn't working properly if I remember correctly. Be careful if you are using it.
 def sendReset(durationSeconds: int, amplitude: float):
     """Temporarily sets the generator to DC voltage for the specified time and amplitude,
     then restores the previous waveform without overwriting any user-defined profiles."""
