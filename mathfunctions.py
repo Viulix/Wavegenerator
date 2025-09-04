@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 def generateSQUSQU(amplitude1, amplitude2, uptime, downtime, periodInMilliseconds=10, factor=1, returnArray=True):
     """
@@ -50,27 +49,6 @@ def generateSQUSQU(amplitude1, amplitude2, uptime, downtime, periodInMillisecond
     else:
         return ",".join(map(str, result))
 
-# Can be ignored as it's not really used and randomly put together.
-def neuron_action_potential(A, B, a, b, xa, xb, points=10000, start=0, end=7, plot=False):
-    """
-    Model for a neuronal spike. This model works with two differently shaped exponential that are superpositioned to achieve a good pulseform. 
-    A, B: Amplitudes of the exponentials. A for spike, B for drop. NOTE: B is the actual amplitude of the drop. A is only barely the amplitude of the peak due to superposition.
-    a, b: Stretch factor for each spike. a > 1 and b < 1 normally.
-    xa, xb: Time shift for each pulse. Must be used and should not be the same.
-
-    """
-    x = np.linspace(start, end, points)
-    firstExponential = A*np.exp(-.5*(10*a*x-xa)**2)
-    secondExponential = B*np.exp(-(10*b*x-xb)**2)
-    y = firstExponential + secondExponential
-    if plot:
-        plt.figure(figsize=(8, 4))
-        plt.plot(x, y, label="Model View")
-        plt.legend()
-        plt.grid()
-        plt.show()
-    return y
-
 def getPulseDifference(pulse, delta=0):
     """
     Generates the difference between a pulse and a shifted version of itself.
@@ -106,8 +84,6 @@ def getPulseDifference(pulse, delta=0):
         # Left shift: copy pulse 'abs(delta)' points to the left
         shifted_pulse[:original_length] = pulse[-delta:]  # Trim from the front if needed
 
-    print(extended_pulse)
-    print(shifted_pulse)
     return extended_pulse - shifted_pulse
 
 def createArbString(pulse, startValue=None):

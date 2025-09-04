@@ -86,34 +86,26 @@ def loadProfile(signal_type, spike_amplitude, ref_amplitude, spike_time, ref_tim
     if signal_type == "Square":
         # Generate the square pulse using the provided parameters.
         pulse = mf.generateSQUSQU(float(spike_amplitude), float(ref_amplitude), spike_time, ref_time, float(pulseWidth), numberScaleFactor)
-        # Check if the user want a  difference-pulse or a single pulse
+
+        # Check if the user want a difference-pulse or a single pulse
         if singlePulse:
             pulseDiff = pulse
             frequency = (1 / (float(spike_time + ref_time))) * 10**3
         else: pulseDiff = mf.getPulseDifference(pulse, int(delta_t)*numberScaleFactor)
         datastring, amplitdueVpp, offset = mf.createArbString(pulseDiff, 0)
 
-        sendAndSaveCustom(datastring)
+        # Send the pulse to the device and wait for it to load.
+        sendAndSaveCustom("0," + datastring) # The 0, is important to tell the device to start with 0V. This is the idle DC value in burst mode. The device will always return to this value after the pulse.
         time.sleep(loadTimeSeconds)
+
         # Update the embedded plot with the normalized pulse.
         updatePlot(ax, canvas, pulseDiff, float(pulseWidth), "SQU")
-        
-    elif signal_type == "Model":
-        x_values = np.linspace(0, 20, 1000)  # Define an appropriate range
-        pulse = mf.modelFunction(x_values, spike_amplitude, ref_amplitude, 0.05)  # Compute y-values
-        nom_pulse = mf.normalizePulse(pulse)
-        datastring = ",".join(map(lambda x: f"{x:.3f}", nom_pulse))
-        maxVoltage = max(abs(pulse))
-       # print(datastring)
-        sendAndSaveCustom("0," + datastring)
-        time.sleep(loadTimeSeconds)
-        updatePlot(ax, canvas, pulse, float(pulseWidth))
     
     else:
         print("Unknown type!")
         return
 
-    # If burst mode is enabled, prepare the trigger.
+    # If burst mode is enabled, prepare the trigger. Important: Without burst mode the trigger won't work and the profiles may not be applied correctly.
     if burst:
         print("Preparing the trigger mode")
         prepareTrigger(frequency, amplitude=amplitdueVpp/2, offset=offset/2)
