@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import numpy as np
 
 def generateSQUSQU(amplitude1, amplitude2, uptime, downtime, periodInMilliseconds=10, factor=1, returnArray=True):
     """
@@ -51,56 +50,7 @@ def generateSQUSQU(amplitude1, amplitude2, uptime, downtime, periodInMillisecond
     else:
         return ",".join(map(str, result))
 
-def dreieck_signal(amp_peak, amp_low, ratio, n_points):
-    """
-    Erzeugt ein Signal mit folgendem Verlauf:
-      1. Anstieg von 0 auf amp_peak
-      2. Direkter Übergang von amp_peak zu amp_low
-      3. Rücklauf von amp_low zu 0
-      
-    Der Parameter ratio bestimmt den Anteil der Gesamtpunkte (abzüglich 2 fester Punkte für den Übergang)
-    für den oberen Teil (0 -> Peak) gegenüber dem unteren Teil (Low -> 0).
-    
-    :param amp_peak: Amplitude des Peaks (Maximum)
-    :param amp_low:  Amplitude des Tiefs (Minimum, z.B. negativ)
-    :param ratio: Anteil der Punkte für den oberen Teil (0 < ratio < 1)
-    :param n_points: Gesamtzahl der Punkte im Signal (mindestens 4)
-    :return: NumPy-Array mit dem Signal
-    """
-    if n_points < 4:
-        raise ValueError("n_points muss mindestens 4 sein.")
-    
-    # Fixer Anteil für den direkten Übergang von amp_peak zu amp_low:
-    n_middle = 2  # Enthält amp_peak und amp_low
-    n_remaining = n_points - n_middle
-    
-    # Punkteaufteilung für den oberen (0 -> amp_peak) und unteren (amp_low -> 0) Teil:
-    n_upper = int(n_remaining * ratio)
-    n_lower = n_remaining - n_upper
-    
-    # Sicherstellen, dass beide Segmente mindestens 1 Punkt enthalten:
-    if n_upper < 1:
-        n_upper = 1
-        n_lower = n_remaining - 1
-    if n_lower < 1:
-        n_lower = 1
-        n_upper = n_remaining - 1
-
-    # Segment 1: von 0 bis amp_peak (n_upper+1 Punkte, inkl. Start und Peak)
-    seg1 = np.linspace(0, amp_peak, n_upper+1, endpoint=True)
-    # Segment 2: Übergang von amp_peak zu amp_low (n_middle Punkte, inkl. beider Endpunkte)
-    seg2 = np.linspace(amp_peak, amp_low, n_middle, endpoint=True)
-    # Segment 3: von amp_low zurück zu 0 (n_lower+1 Punkte, inkl. Low und Endpunkt)
-    seg3 = np.linspace(amp_low, 0, n_lower+1, endpoint=True)
-    
-    # An den Übergängen würden sonst Punkte doppelt vorkommen.
-    # Daher entfernen wir das erste Element von seg2 und seg3:
-    signal = np.concatenate([seg1, seg2[1:], seg3[1:]])
-    return signal
-
-import numpy as np
-import matplotlib.pyplot as plt
-
+# Can be ignored as it's not really used and randomly put together.
 def neuron_action_potential(A, B, a, b, xa, xb, points=10000, start=0, end=7, plot=False):
     """
     Model for a neuronal spike. This model works with two differently shaped exponential that are superpositioned to achieve a good pulseform. 
@@ -121,96 +71,44 @@ def neuron_action_potential(A, B, a, b, xa, xb, points=10000, start=0, end=7, pl
         plt.show()
     return y
 
-# Simulation ausführen
-# neuron_action_potential(10, -3, 2, .85, 3, 3, plot=True)
-
-
-
-def getPulseDifferenceAsString(puls1, puls2, delta=0):
-    """Generates the difference between two pulses as a string."""
-    print(puls1)
-    print(puls2)
-    newPuls1 = [0] * delta + str.split(puls1, ",")
-    newPuls2 = str.split(puls2, ",") + [0] * delta
-    
-    diffPuls = [0] # Add a zero in order to make the default value 0 V. This is required for burst mode!
-    for i in range(len(newPuls1)):
-        diffPuls.append((float(newPuls1[i]) - float(newPuls2[i])) / 2)
-
-    resultString = ",".join(map(str, diffPuls))
-    return resultString
-
-
 def getPulseDifference(pulse, delta=0):
     """
+    Generates the difference between a pulse and a shifted version of itself.
+
+    Parameters:
+        pulse (list or np.ndarray): The input pulse waveform.
+        delta (int, optional): The number of points to shift the pulse.
+            - If delta > 0: shifts the pulse to the right by 'delta' points.
+            - If delta < 0: shifts the pulse to the left by 'abs(delta)' points.
+            - If delta == 0: returns an array of zeros with the same length as the input pulse.
+
+    Returns:
+        np.ndarray: The difference between the original and shifted pulse.
     """
-    pulse = np.asarray(pulse)  # Sicherstellen, dass pulse ein NumPy-Array ist
+    pulse = np.asarray(pulse)  # Ensure pulse is a NumPy array
     original_length = len(pulse)
-    new_length = original_length + abs(delta)  # Neue Länge nach Verschiebung
+    new_length = original_length + abs(delta)  # New length after shifting
 
-    if(delta==0):
-        return np.zeros(original_length) 
+    if delta == 0:
+        return np.zeros(original_length)
 
-    # Neues Array mit 0-Werten der passenden Größe erstellen
+    # Create new arrays filled with zeros of the appropriate size
     extended_pulse = np.zeros(new_length)
     shifted_pulse = np.zeros(new_length)
 
-
-    # Originalen Puls an den Anfang des neuen Arrays kopieren
+    # Copy the original pulse to the beginning of the new array
     extended_pulse[:original_length] = pulse
 
     if delta > 0:
-        # Rechtsverschiebung: Kopiere Pulse um delta nach rechts
+        # Right shift: copy pulse 'delta' points to the right
         shifted_pulse[delta:original_length + delta] = pulse
     elif delta < 0:
-        # Linksverschiebung: Kopiere Pulse um -delta nach links
-        shifted_pulse[:original_length] = pulse[-delta:]  # Kürze vorne, falls nötig
+        # Left shift: copy pulse 'abs(delta)' points to the left
+        shifted_pulse[:original_length] = pulse[-delta:]  # Trim from the front if needed
+
     print(extended_pulse)
     print(shifted_pulse)
     return extended_pulse - shifted_pulse
-
-def modelFunction(x, A, B, C):
-    """Returns a hard coded function of x. Used for calculation purposes. Only change, if you want to change the plot."""
-    f = A * np.exp(-.5 *(x-2.94)**2)- B*np.exp(-.02*(x-7.94)**2) + C*np.exp(-.02 * (x+4.06)**2)
-    return f
-
-def sendMathFunction(smu, datastr: str):
-    """Sends a command to the wavegenerator"""
-
-def normalize_and_format_function(func, sampleNumber: int, a, b):
-    """Normalizies a function to provide values from -1 to 1. It calculates all values of func from a to b."""
-
-    datastr = "0,"
-    
-    # Calculates values
-    x_values = np.linspace(a, b, sampleNumber)  
-    y_values = func(x_values)
-    
-    # Get min and max values
-    min_value = np.min(y_values)
-    max_value = np.max(y_values)
-
-    maximumValue = np.max([abs(min_value), abs(max_value)])
-    print(maximumValue)
-    normalized_values = y_values / maximumValue
-    
-    # Create string for the wave generator
-    for value in normalized_values:
-        datastr += f"{value:.4f},"
-    
-    return datastr
-
-def normalizePulse(pulse):
-    """Finds the maximum value of the function and normalizes it based on this. Output will be a pulse with max = 1/-1"""
-    pulse = np.array(pulse)
-    print(pulse)
-    max = np.max(pulse)
-    min = np.min(pulse)
-    print("Max:", [abs(min), abs(max)])
-    maximumValue = np.max([abs(min), abs(max)])
-    print(maximumValue)
-    if maximumValue == 0: return pulse
-    return  pulse / maximumValue
 
 def createArbString(pulse, startValue=None):
     """
