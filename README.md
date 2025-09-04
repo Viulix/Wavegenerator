@@ -1,6 +1,6 @@
 # Wavegenerator
 
-This is a piece of software that allows you to send controlled impulsed via an function generator.
+This is a piece of software that allows you to send controlled impulses via an function generator.
 
 ---
 
